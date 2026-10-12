@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F5FAD">
+<link rel="manifest" href="manifest.webmanifest">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>서보 전자기어비 계산기</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="전자기어비">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: phone-first single column; ≥900px splits inputs | results. Sticky result strip on phone. */
+:root {
+  --bg: #EDF1F6;
+  --surface: #FFFFFF;
+  --sunk: #F4F7FB;
+  --ink: #142033;
+  --muted: #5A6678;
+  --line: #D5DCE6;
+  --accent: #1F5FAD;
+  --accent-ink: #FFFFFF;
+  --gear: #D88A06;
+  --ok: #1E7F48;   --ok-bg: #E3F4EA;
+  --warn: #9A6408; --warn-bg: #FFF3D6;
+  --err: #B42F28;  --err-bg: #FDE6E4;
+  --info-bg: #E8EFF8;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0C131E; --surface: #142033; --sunk: #0F1928; --ink: #E6ECF5; --muted: #95A3B8; --line: #26354D;
+  --accent: #6EA8FF; --accent-ink: #0C131E; --gear: #F5B43C;
+  --ok: #5FD394; --ok-bg: #133325; --warn: #F2C45A; --warn-bg: #3A2E10; --err: #FF8A80; --err-bg: #3D1A18; --info-bg: #182A44;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0C131E; --surface: #142033; --sunk: #0F1928; --ink: #E6ECF5; --muted: #95A3B8; --line: #26354D;
+  --accent: #6EA8FF; --accent-ink: #0C131E; --gear: #F5B43C;
+  --ok: #5FD394; --ok-bg: #133325; --warn: #F2C45A; --warn-bg: #3A2E10; --err: #FF8A80; --err-bg: #3D1A18; --info-bg: #182A44;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5; -webkit-text-size-adjust: 100%; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 16px 16px 120px; }
+@media (min-width: 900px) { .wrap { padding-block: 24px 40px; } }
+
+header.top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+header.top img { width: 40px; height: 40px; border-radius: 9px; flex: none; }
+header.top h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+header.top p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.grid { display: grid; gap: 16px; }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); align-items: start; } .results { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); } }
+.col { display: grid; gap: 12px; min-width: 0; }
+
+section.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 14px 12px; min-width: 0; }
+.panel h2 { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 10px; text-transform: uppercase; }
+
+.field { display: grid; gap: 4px; margin-bottom: 10px; }
+.field > label, .field > .lbl { font-size: 13px; color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { min-width: 0; }
+.unit { font-family: var(--f-mono); color: var(--muted); font-size: 13px; min-width: 2.2em; }
+input[type=text], select {
+  width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--sunk);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-height: 42px; appearance: none; -webkit-appearance: none;
+}
+select { background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 30px; }
+input.num { font-family: var(--f-mono); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input.bad { border-color: var(--err); background: var(--err-bg); }
+
+button { font: inherit; cursor: pointer; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 8px 12px; min-height: 42px; font-size: 14px; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--sunk); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+.seg button { border: 0; background: transparent; color: var(--muted); border-radius: 7px; padding: 8px 6px; font-size: 14px; min-height: 38px; }
+.seg button[aria-pressed=true] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.chips button { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 4px 10px; font-family: var(--f-mono); font-size: 13px; min-height: 32px; }
+.chips button.on { border-color: var(--accent); color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); margin: -4px 0 10px; }
+
+.specs { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; margin: 4px 0 0; }
+.specs dt { color: var(--muted); }
+.specs dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.src { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; border-radius: 999px; padding: 2px 8px; margin-top: 8px; }
+.src.manual { background: var(--ok-bg); color: var(--ok); }
+.src.general { background: var(--warn-bg); color: var(--warn); }
+
+/* Result */
+.headline { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; position: relative; overflow: hidden; }
+.headline::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--muted); }
+.headline[data-kind=ok]::before { background: var(--ok); }
+.headline[data-kind=approx]::before { background: var(--gear); }
+.headline[data-kind=err]::before { background: var(--err); }
+.headline .cap { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+.ratio { font-family: var(--f-mono); font-weight: 600; font-size: clamp(26px, 8vw, 40px); line-height: 1.15; margin: 4px 0 2px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.ratio .slash { color: var(--muted); font-weight: 500; padding: 0 0.15em; }
+.dec { font-family: var(--f-mono); color: var(--muted); font-size: 14px; }
+.badge { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.approx { background: var(--warn-bg); color: var(--warn); }
+.badge.err { background: var(--err-bg); color: var(--err); }
+
+.params { display: grid; gap: 0; }
+.param { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.param:first-child { border-top: 0; padding-top: 2px; }
+.param .code { font-family: var(--f-mono); font-weight: 600; font-size: 14px; }
+.param .name { color: var(--muted); font-size: 13px; }
+.param .val { font-family: var(--f-mono); font-weight: 600; font-size: 20px; color: var(--accent); text-align: right; grid-row: span 2; align-self: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.param .val.text { font-family: var(--f-body); font-size: 14px; font-weight: 500; color: var(--ink); text-align: left; grid-column: 1 / -1; grid-row: auto; }
+.param .note { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.group-h { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 2px; padding-top: 10px; border-top: 1px dashed var(--line); }
+
+.msgs { display: grid; gap: 6px; }
+.msg { display: grid; grid-template-columns: 18px 1fr; gap: 6px; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--info-bg); }
+.msg.warn { background: var(--warn-bg); }
+.msg.err { background: var(--err-bg); }
+.msg .ic { font-weight: 700; color: var(--accent); }
+.msg.warn .ic { color: var(--warn); }
+.msg.err .ic { color: var(--err); }
+
+.details { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: 5px 14px; font-size: 13px; margin: 0; }
+.details dt { color: var(--muted); }
+.details dd { margin: 0; font-family: var(--f-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.toast { font-size: 13px; color: var(--ok); align-self: center; }
+
+/* Phone: sticky result strip */
+.strip { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 12px; box-shadow: 0 -4px 16px rgba(0,0,0,.08); }
+.strip .vals { flex: 1; min-width: 0; font-family: var(--f-mono); font-size: 13px; line-height: 1.35; }
+.strip .vals b { font-size: 17px; color: var(--accent); }
+.strip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.strip[data-kind=ok] .dot { background: var(--ok); }
+.strip[data-kind=approx] .dot { background: var(--gear); }
+.strip[data-kind=err] .dot { background: var(--err); }
+@media (min-width: 900px) { .strip { display: none; } }
+
+footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <img alt="" src="apple-touch-icon.png">
+    <div>
+      <h1>서보 전자기어비 계산기</h1>
+      <p>드라이브와 기구 값을 넣으면 분자·분모를 바로 계산합니다</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="h-drive">
+        <h2 id="h-drive">서보 드라이브</h2>
+        <div class="field">
+          <label for="drive">시리즈</label>
+          <select id="drive"></select>
+        </div>
+        <div class="field">
+          <label for="enc">엔코더 분해능 (pulse/rev)</label>
+          <div class="row">
+            <input type="text" id="enc" class="num" inputmode="numeric" autocomplete="off">
+            <button class="btn" id="encReset" type="button">기본값</button>
+          </div>
+        </div>
+        <dl class="specs" id="specs"></dl>
+        <span class="src" id="src"></span>
+      </section>
+
+      <section class="panel" aria-labelledby="h-basis">
+        <h2 id="h-basis">계산 기준</h2>
+        <div class="seg" role="group" aria-label="계산 기준">
+          <button type="button" id="modeMech" aria-pressed="true">기구 + 지령 단위</button>
+          <button type="button" id="modePpr" aria-pressed="false">1회전당 펄스 수</button>
+        </div>
+
+        <div id="mechBox">
+          <div class="field">
+            <label for="mech">기구 형식</label>
+            <select id="mech">
+              <option value="BallScrew">볼스크류</option>
+              <option value="BeltTeeth">타이밍벨트 (잇수 × 피치)</option>
+              <option value="BeltDia">벨트·풀리 (직경)</option>
+              <option value="Rack">랙 & 피니언 (모듈 × 잇수)</option>
+              <option value="Rotary">회전 테이블 / 인덱스 (360°)</option>
+              <option value="Roll">롤 피드 (직경)</option>
+              <option value="Direct">직접 입력 (부하 1회전당 이동량)</option>
+            </select>
+          </div>
+          <div class="field" data-for="BallScrew"><label for="lead">볼스크류 리드</label>
+            <div class="row"><input type="text" id="lead" class="num" inputmode="decimal" value="10"><span class="unit">mm</span></div></div>
+          <div class="field" data-for="BeltTeeth"><label for="teeth">풀리 잇수</label>
+            <div class="row"><input type="text" id="teeth" class="num" inputmode="decimal" value="20"><span class="unit">T</span></div></div>
+          <div class="field" data-for="BeltTeeth"><label for="pitch">벨트 피치</label>
+            <div class="row"><input type="text" id="pitch" class="num" inputmode="decimal" value="5"><span class="unit">mm</span></div></div>
+          <div class="field" data-for="BeltDia Roll"><label for="dia">직경 (D)</label>
+            <div class="row"><input type="text" id="dia" class="num" inputmode="decimal" value="50"><span class="unit">mm</span></div></div>
+          <div class="field" data-for="Rack"><label for="module">모듈 (m)</label>
+            <div class="row"><input type="text" id="module" class="num" inputmode="decimal" value="2"><span class="unit"></span></div></div>
+          <div class="field" data-for="Rack"><label for="pinion">피니언 잇수</label>
+            <div class="row"><input type="text" id="pinion" class="num" inputmode="decimal" value="20"><span class="unit">T</span></div></div>
+          <div class="field" data-for="Direct"><label for="direct">부하 1회전당 이동량</label>
+            <div class="row"><input type="text" id="direct" class="num" inputmode="decimal" value="100">
+              <input type="text" id="directUnit" value="mm" aria-label="단위" style="max-width: 5.5em"></div></div>
+
+          <div class="field">
+            <span class="lbl">감속비 (모터 회전 : 부하 회전)</span>
+            <div class="row">
+              <input type="text" id="redM" class="num" inputmode="decimal" value="1" aria-label="모터 회전수">
+              <span class="unit" style="min-width:auto">:</span>
+              <input type="text" id="redL" class="num" inputmode="decimal" value="1" aria-label="부하 회전수">
+            </div>
+          </div>
+          <p class="hint">1/5 감속기 → 5 : 1 · 풀리 20T→40T → 40 : 20</p>
+
+          <div class="field">
+            <label for="unit" id="unitCap">지령 단위 (1 pulse당 이동량)</label>
+            <div class="row"><input type="text" id="unit" class="num" inputmode="decimal" value="0.001"><span class="unit" id="unitLbl">mm</span></div>
+            <div class="chips" id="unitChips"></div>
+          </div>
+        </div>
+
+        <div id="pprBox" hidden>
+          <div class="field">
+            <label for="ppr">모터 1회전당 지령 펄스 수</label>
+            <div class="row"><input type="text" id="ppr" class="num" inputmode="numeric" value="10000"><span class="unit">pulse</span></div>
+            <div class="chips" id="pprChips"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-speed">
+        <h2 id="h-speed">속도 검토</h2>
+        <div class="field" style="margin-bottom:4px">
+          <label for="rpm">모터 최대 회전수 (비우면 생략)</label>
+          <div class="row"><input type="text" id="rpm" class="num" inputmode="numeric" value="3000"><span class="unit">rpm</span></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col results" id="results">
+      <div class="headline" id="headline">
+        <div class="cap">전자기어비 · 분자 / 분모</div>
+        <div class="ratio" id="ratio">-</div>
+        <div class="dec" id="dec"></div>
+        <span class="badge" id="badge"></span>
+      </div>
+
+      <section class="panel" aria-labelledby="h-params">
+        <h2 id="h-params">드라이브 파라미터 설정값</h2>
+        <div class="params" id="params"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-msgs">
+        <h2 id="h-msgs">확인 사항</h2>
+        <div class="msgs" id="msgs"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-det">
+        <h2 id="h-det">계산 상세</h2>
+        <dl class="details" id="details"></dl>
+      </section>
+
+      <div class="actions">
+        <button class="btn primary" id="copy" type="button">결과 복사</button>
+        <span class="toast" id="toast" role="status"></span>
+      </div>
+      <textarea id="copyFallback" hidden readonly style="width:100%;min-height:160px;font-family:var(--f-mono);font-size:12px"></textarea>
+    </div>
+  </div>
+
+  <footer>
+    전자기어비 = 엔코더 분해능 ÷ 모터 1회전당 지령 펄스 수. 계산은 정수 분수로 처리합니다.
+    LS L7S, MR-J5-A 는 매뉴얼로 확인한 값이며, 나머지 드라이브는 현장 적용 전 매뉴얼로 확인하세요.
+  </footer>
+</div>
+
+<div class="strip" id="strip" role="button" tabindex="0" aria-label="계산 결과로 이동">
+  <span class="dot"></span>
+  <div class="vals" id="stripVals">-</div>
+  <span class="badge" id="stripBadge" style="margin:0"></span>
+</div>
+
+<script id="engine">
+/* ===== 정확한 분수 연산 (BigInt) ===== */
+const Q = (() => {
+  const gcd = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) { [a, b] = [b, a % b]; } return a; };
+  const make = (n, d = 1n) => {
+    n = BigInt(n); d = BigInt(d);
+    if (d === 0n) throw new Error("0으로 나눌 수 없습니다.");
+    if (d < 0n) { n = -n; d = -d; }
+    const g = gcd(n, d) || 1n;
+    return { n: n / g, d: d / g };
+  };
+  const add = (a, b) => make(a.n * b.d + b.n * a.d, a.d * b.d);
+  const sub = (a, b) => make(a.n * b.d - b.n * a.d, a.d * b.d);
+  const mul = (a, b) => make(a.n * b.n, a.d * b.d);
+  const div = (a, b) => { if (b.n === 0n) throw new Error("0으로 나눌 수 없습니다."); return make(a.n * b.d, a.d * b.n); };
+  const cmp = (a, b) => { const x = a.n * b.d - b.n * a.d; return x > 0n ? 1 : x < 0n ? -1 : 0; };
+  const eq = (a, b) => a.n === b.n && a.d === b.d;
+  const abs = a => make(a.n < 0n ? -a.n : a.n, a.d);
+  const sign = a => a.n > 0n ? 1 : a.n < 0n ? -1 : 0;
+  const num = a => Number(a.n) / Number(a.d);
+  const isInt = a => a.d === 1n;
+  const str = a => a.d === 1n ? a.n.toString() : `${a.n}/${a.d}`;
+  const parseDec = s => {
+    const m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d{1,2}))?$/.exec(s);
+    if (!m) return null;
+    const ip = m[2] || "", fp = m[3] || "";
+    if (!ip && !fp) return null;
+    const exp = m[4] ? parseInt(m[4], 10) : 0;
+    let n = BigInt("0" + ip + fp);
+    if (m[1] === "-") n = -n;
+    const scale = fp.length - exp;
+    return scale >= 0 ? make(n, 10n ** BigInt(scale)) : make(n * 10n ** BigInt(-scale), 1n);
+  };
+  const parse = text => {
+    if (text == null) return null;
+    const s = String(text).trim().replace(/[,\s]/g, "");
+    if (!s) return null;
+    const i = s.indexOf("/");
+    if (i >= 0) {
+      const a = parseDec(s.slice(0, i)), b = parseDec(s.slice(i + 1));
+      if (!a || !b || b.n === 0n) return null;
+      return div(a, b);
+    }
+    return parseDec(s);
+  };
+  /* 분자/분모 상한 안의 최적 근사 (연분수 + 준수렴분수) */
+  const best = (x, maxN, maxD) => {
+    maxN = BigInt(maxN); maxD = BigInt(maxD);
+    if (x.n <= maxN && x.d <= maxD) return x;
+    let h0 = 0n, h1 = 1n, k0 = 1n, k1 = 0n, p = x.n, q = x.d;
+    while (q !== 0n) {
+      const a = p / q;
+      const h2 = a * h1 + h0, k2 = a * k1 + k0;
+      if (h2 > maxN || k2 > maxD) {
+        let t = a;
+        if (h1 !== 0n) { const tt = (maxN - h0) / h1; if (tt < t) t = tt; }
+        if (k1 !== 0n) { const tt = (maxD - k0) / k1; if (tt < t) t = tt; }
+        let bestR = (k1 !== 0n && h1 !== 0n) ? make(h1, k1) : null;
+        if (t >= 1n) {
+          const hs = t * h1 + h0, ks = t * k1 + k0;
+          if (hs !== 0n && ks !== 0n && hs <= maxN && ks <= maxD) {
+            const semi = make(hs, ks);
+            if (!bestR || cmp(abs(sub(semi, x)), abs(sub(bestR, x))) < 0) bestR = semi;
+          }
+        }
+        return bestR || (cmp(x, make(1n)) < 0 ? make(1n, maxD) : make(maxN, 1n));
+      }
+      h0 = h1; h1 = h2; k0 = k1; k1 = k2;
+      [p, q] = [q, p - a * q];
+    }
+    return make(h1, k1);
+  };
+  const PI = parse("3.14159265358979323846264338327950288");
+  return { make, add, sub, mul, div, cmp, eq, abs, sign, num, isInt, str, parse, best, PI, ONE: make(1n) };
+})();
+
+/* ===== 드라이브 목록 (PC 버전 drives.json 기본값과 동일) ===== */
+const INT_MAX = 2147483647, M24 = 16777215, M20 = 1048576, M30 = 1073741824;
+const DRIVES = [
+  { id: "MIT-MR-J5-A", mfr: "미쯔비시", series: "MR-J5-A", desc: "펄스열", enc: 67108864, encNote: "26bit (HK 모터)", src: "manual",
+    numP: "PA06", numN: "CMX 전자기어 분자", numMax: INT_MAX, denP: "PA07", denN: "CDV 전자기어 분모", denMax: INT_MAX,
+    rMin: "1/10", rMax: "64000", rExcl: true,
+    pprP: "PA05", pprN: "FBP 1회전당 지령 입력 펄스 수", pprMin: 1000, pprMax: 1000000, pprNote: "PA21.3 = 1 (1회전당 지령 입력 펄스수) 일 때만 유효",
+    setup: "PA21.3 = 0 (전자 기어, 초기값), CM1/CM2 개방 → PA06/PA07 사용", maxK: 4000,
+    filterP: "PA13.2", filter: [[200, "3"], [500, "2"], [1000, "1"], [4000, "0"]],
+    compat: [{ name: "J4 호환", setup: "PA21.3 = 4 (J4 전자 기어 설정값 호환 모드)", mult: 16 }],
+    notes: "범위 밖 기어비는 가감속 시 이상음 또는 설정 속도·가감속으로 운전 불가할 수 있음(파라미터편). 오픈컬렉터 입력은 최대 200 kpps. 분자 대체값 PC32~PC34(CMX2~4)는 CM1/CM2 입력으로 선택(절대위치 시스템에서는 사용 불가)." },
+  { id: "MIT-MR-J4-A", mfr: "미쯔비시", series: "MR-J4-A", desc: "펄스열", enc: 4194304, encNote: "22bit (HG 모터)",
+    numP: "PA06", numN: "CMX 전자기어 분자", numMax: M24, denP: "PA07", denN: "CDV 전자기어 분모", denMax: M24,
+    rMin: "1/10", rMax: "4000", pprP: "PA05", pprN: "FBP 1회전당 지령 펄스 수", pprMin: 1000, pprMax: 1000000,
+    pprNote: "PA21 전자기어 선택을 'PA05 사용'으로 변경해야 유효", setup: "PA21 전자기어 선택 = 전자기어(PA06/PA07)", maxK: 4000,
+    notes: "오픈컬렉터 입력은 최대 200 kpps." },
+  { id: "MIT-MR-JE-A", mfr: "미쯔비시", series: "MR-JE-A", desc: "펄스열", enc: 131072, encNote: "17bit (HG-KN/SN 모터)",
+    numP: "PA06", numN: "CMX 전자기어 분자", numMax: M24, denP: "PA07", denN: "CDV 전자기어 분모", denMax: M24,
+    rMin: "1/10", rMax: "4000", pprP: "PA05", pprN: "FBP 1회전당 지령 펄스 수", pprMin: 1000, pprMax: 1000000,
+    pprNote: "PA21 전자기어 선택을 'PA05 사용'으로 변경해야 유효", setup: "PA21 전자기어 선택 = 전자기어(PA06/PA07)", maxK: 4000,
+    notes: "오픈컬렉터 입력은 최대 200 kpps." },
+  { id: "MIT-MR-J3-A", mfr: "미쯔비시", series: "MR-J3-A", desc: "펄스열", enc: 262144, encNote: "18bit (HF 모터)",
+    numP: "PA06", numN: "CMX 전자기어 분자", numMax: M20, denP: "PA07", denN: "CDV 전자기어 분모", denMax: M20,
+    rMin: "1/10", rMax: "2000", maxK: 1000, notes: "오픈컬렉터 입력은 최대 200 kpps." },
+  { id: "MIT-MR-J2S-A", mfr: "미쯔비시", series: "MR-J2S-A", desc: "구형 펄스열", enc: 131072, encNote: "17bit (HC 모터)",
+    numP: "No.3", numN: "CMX 전자기어 분자", numMax: 65535, denP: "No.4", denN: "CDV 전자기어 분모", denMax: 65535,
+    rMin: "1/50", rMax: "500", maxK: 500, notes: "오픈컬렉터 입력은 최대 200 kpps." },
+
+  { id: "PAN-MINAS-A6", mfr: "파나소닉", series: "MINAS A6 (A6SF/A6SG)", desc: "펄스열", enc: 8388608, encNote: "23bit",
+    numP: "Pr0.09", numN: "제1 지령분배 체배 분자", numMax: M30, denP: "Pr0.10", denN: "지령분배 체배 분모", denMax: M30,
+    rMin: "1/1000", rMax: "8000", pprP: "Pr0.08", pprN: "모터 1회전당 지령 펄스 수", pprMin: 1, pprMax: 8388608,
+    pprNote: "Pr0.08 ≠ 0 이면 Pr0.09/Pr0.10 은 무시됨", setup: "Pr0.08 = 0 (0일 때만 Pr0.09/Pr0.10 유효)", maxK: 4000,
+    notes: "고속 라인드라이버 전용 입력 사용 시 최대 8 Mpps, 오픈컬렉터 200 kpps." },
+  { id: "PAN-MINAS-A5", mfr: "파나소닉", series: "MINAS A5", desc: "펄스열", enc: 1048576, encNote: "20bit",
+    numP: "Pr0.09", numN: "제1 지령분배 체배 분자", numMax: M30, denP: "Pr0.10", denN: "지령분배 체배 분모", denMax: M30,
+    rMin: "1/1000", rMax: "1000", pprP: "Pr0.08", pprN: "모터 1회전당 지령 펄스 수", pprMin: 1, pprMax: 1048576,
+    pprNote: "Pr0.08 ≠ 0 이면 Pr0.09/Pr0.10 은 무시됨", setup: "Pr0.08 = 0 (0일 때만 Pr0.09/Pr0.10 유효)", maxK: 4000,
+    notes: "오픈컬렉터 입력은 최대 200 kpps." },
+  { id: "PAN-MINAS-A6B", mfr: "파나소닉", series: "MINAS A6B", desc: "EtherCAT", enc: 8388608, encNote: "23bit", cia: true,
+    notes: "PDO/SDO 로 0x6091, 0x6092 설정. 상위 컨트롤러의 위치 단위와 맞출 것." },
+
+  { id: "LS-L7S", mfr: "LS ELECTRIC", series: "XDL-L7S (L7SA)", desc: "펄스열", enc: 524288, src: "manual",
+    encNote: "19bit 시리얼 (18bit 모터는 262,144 / Quadrature 는 P/R × 4)",
+    numP: "P4-01", numN: "전자기어비 분자 1", numMax: 2097152, denP: "P4-05", denN: "전자기어비 분모 1", denMax: 32767,
+    rMin: "1", rMax: "60000", rWarn: true,
+    setup: "P4-09 = 0 (전자기어비 1~4 선택), EGEAR1/EGEAR2 입력 OFF → 전자기어비 1 사용. 서보 OFF 상태에서 설정(*)", maxK: 1000,
+    notes: "매뉴얼: 최종 기어비가 소수점(1 미만) 또는 60000 초과 시 구동 오류가 발생할 수 있음. 오픈컬렉터 입력은 최대 200 kpps. 기어비 2~4 는 P4-02~04 / P4-06~08 (EGEAR1·2 입력으로 선택)." },
+  { id: "LS-L7NH", mfr: "LS ELECTRIC", series: "L7NH", desc: "EtherCAT", enc: 524288, encNote: "19bit 시리얼", cia: true,
+    notes: "0x6091 Gear Ratio, 0x6092 Feed Constant 설정. 엔코더 사양이 다르면 분해능을 수정하세요." },
+
+  { id: "YAS-SIGMA7", mfr: "야스카와", series: "Σ-7 (SGD7S-□□□A00)", desc: "펄스열", enc: 16777216, encNote: "24bit",
+    numP: "Pn20E", numN: "전자기어비 (분자) B", numMax: M30, denP: "Pn210", denN: "전자기어비 (분모) A", denMax: M30,
+    rMin: "1/1000", rMax: "64000", maxK: 4000, notes: "오픈컬렉터 입력은 최대 200 kpps." },
+  { id: "YAS-SIGMA5", mfr: "야스카와", series: "Σ-V (SGDV-□□□01)", desc: "펄스열", enc: 1048576, encNote: "20bit",
+    numP: "Pn20E", numN: "전자기어비 (분자) B", numMax: M30, denP: "Pn210", denN: "전자기어비 (분모) A", denMax: M30,
+    rMin: "1/1000", rMax: "4000", maxK: 4000, notes: "오픈컬렉터 입력은 최대 200 kpps." },
+
+  { id: "DEL-ASDA-B2", mfr: "델타", series: "ASDA-B2", desc: "펄스열", enc: 160000, encNote: "17bit (드라이브 내부 160,000 pulse/rev)",
+    numP: "P1-44", numN: "전자기어 분자 N1", numMax: 67108863, denP: "P1-45", denN: "전자기어 분모 M", denMax: INT_MAX,
+    rMin: "1/50", rMax: "25600", maxK: 4000, notes: "저속 펄스(오픈컬렉터/일반 차동) 입력은 최대 500 kpps." },
+  { id: "DEL-ASDA-A2", mfr: "델타", series: "ASDA-A2", desc: "펄스열", enc: 1280000, encNote: "20bit (드라이브 내부 1,280,000 pulse/rev)",
+    numP: "P1-44", numN: "전자기어 분자 N1", numMax: 67108863, denP: "P1-45", denN: "전자기어 분모 M", denMax: INT_MAX,
+    rMin: "1/50", rMax: "25600", maxK: 4000, notes: "저속 펄스 입력은 최대 500 kpps." },
+
+  { id: "CUSTOM", mfr: "사용자 정의", series: "직접 입력 (분자/분모 범용)", desc: "", enc: 131072, encNote: "엔코더 분해능을 직접 입력",
+    numP: "", numN: "전자기어 분자", numMax: INT_MAX, denP: "", denN: "전자기어 분모", denMax: INT_MAX, notes: "" },
+];
+
+/* ===== 표시 형식 ===== */
+const grp = s => s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+const G = (x, p = 10) => { if (!isFinite(x)) return String(x); if (x === 0) return "0"; const s = Number(x.toPrecision(p)); return Math.abs(s) >= 1e15 || Math.abs(s) < 1e-6 ? s.toExponential(p - 1).replace(/\.?0+e/, "e") : String(s); };
+const terminating = d => { while (d % 2n === 0n) d /= 2n; while (d % 5n === 0n) d /= 5n; return d === 1n; };
+const fmtQ = r => Q.isInt(r) ? grp(r.n.toString()) : (r.d <= 1000000n && !terminating(r.d) ? `${Q.str(r)} (≈ ${G(Q.num(r))})` : G(Q.num(r)));
+const fmtF = pps => pps >= 1e6 ? `${G(pps / 1e6, 4)} Mpps` : pps >= 1e3 ? `${G(pps / 1e3, 4)} kpps` : `${G(pps, 4)} pps`;
+
+/* ===== 계산기 (PC 버전 GearCalculator 와 동일한 규칙) ===== */
+function travelPerLoadRev(i) {
+  const pos = (v, n) => { if (!v || Q.sign(v) <= 0) throw new Error(`${n} 값은 0보다 커야 합니다.`); };
+  switch (i.mech) {
+    case "BallScrew": pos(i.lead, "볼스크류 리드"); return [i.lead, "mm", false, `볼스크류 (리드 ${Q.str(i.lead)} mm)`];
+    case "BeltTeeth": pos(i.teeth, "풀리 잇수"); pos(i.pitch, "벨트 피치"); return [Q.mul(i.teeth, i.pitch), "mm", false, `타이밍벨트 (잇수 ${Q.str(i.teeth)} × 피치 ${Q.str(i.pitch)} mm)`];
+    case "BeltDia": pos(i.dia, "풀리 직경"); return [Q.mul(Q.PI, i.dia), "mm", true, `벨트/풀리 (직경 ${Q.str(i.dia)} mm, π·D)`];
+    case "Rack": pos(i.module, "모듈"); pos(i.pinion, "피니언 잇수"); return [Q.mul(Q.mul(Q.PI, i.module), i.pinion), "mm", true, `랙 & 피니언 (모듈 ${Q.str(i.module)} × 잇수 ${Q.str(i.pinion)}, π·m·Z)`];
+    case "Rotary": return [Q.make(360n), "°", false, "회전 테이블 (360°/회전)"];
+    case "Roll": pos(i.dia, "롤 직경"); return [Q.mul(Q.PI, i.dia), "mm", true, `롤 피드 (직경 ${Q.str(i.dia)} mm, π·D)`];
+    case "Direct": { pos(i.direct, "부하 1회전당 이동량"); const u = (i.directUnit || "").trim() || "unit"; return [i.direct, u, false, `직접 입력 (${Q.str(i.direct)} ${u}/회전)`]; }
+  }
+  throw new Error("알 수 없는 기구 형식입니다.");
+}
+
+function calculate(drv, i) {
+  const r = { ok: false, settings: [], msgs: [], details: [], unit: "", usesPi: false };
+  const msg = (sev, text) => r.msgs.push({ sev, text });
+  const det = (k, v) => r.details.push([k, v]);
+  try {
+    const enc = i.enc ?? drv.enc;
+    if (!(enc > 0)) throw new Error("엔코더 분해능은 1 이상이어야 합니다.");
+    const encQ = Q.make(BigInt(enc));
+    let ppr, travelLoad = null, travelMotor = null, reducer = Q.ONE;
+
+    if (i.mode === "mech") {
+      let desc;
+      [travelLoad, r.unit, r.usesPi, desc] = travelPerLoadRev(i);
+      if (!i.redM || Q.sign(i.redM) <= 0) throw new Error("감속비(모터 측) 값은 0보다 커야 합니다.");
+      if (!i.redL || Q.sign(i.redL) <= 0) throw new Error("감속비(부하 측) 값은 0보다 커야 합니다.");
+      if (!i.unit || Q.sign(i.unit) <= 0) throw new Error("지령 단위 값은 0보다 커야 합니다.");
+      reducer = Q.div(i.redM, i.redL);
+      travelMotor = Q.div(travelLoad, reducer);
+      ppr = Q.div(travelMotor, i.unit);
+      det("기구", desc);
+      det("부하 1회전당 이동량", `${fmtQ(travelLoad)} ${r.unit}`);
+      det("감속비 (모터:부하)", `${Q.str(i.redM)} : ${Q.str(i.redL)}`);
+      det("모터 1회전당 이동량", `${fmtQ(travelMotor)} ${r.unit}`);
+      det("지령 단위 (1 pulse)", `${fmtQ(i.unit)} ${r.unit}`);
+    } else {
+      if (!i.ppr || Q.sign(i.ppr) <= 0) throw new Error("모터 1회전당 지령 펄스 수 값은 0보다 커야 합니다.");
+      ppr = i.ppr; r.unit = "pulse";
+    }
+
+    r.ppr = ppr;
+    r.exact = Q.div(encQ, ppr);
+    det("모터 1회전당 지령 펄스 수", Q.isInt(ppr) ? grp(ppr.n.toString()) : `${fmtQ(ppr)} (정수 아님)`);
+    det("엔코더 분해능", `${grp(String(enc))} pulse/rev ${enc !== drv.enc ? "(사용자 지정)" : drv.encNote}`);
+    det("이론 전자기어비", r.usesPi ? `${G(Q.num(r.exact), 12)} (π 포함)` : `${Q.str(r.exact)}  (= ${G(Q.num(r.exact))})`);
+
+    if (drv.cia) applyCia(drv, i, r, encQ, travelLoad, reducer);
+    else applyNumDen(drv, r, encQ, ppr, travelMotor, msg, det);
+    r.ok = true;
+
+    if (!r.isExact) {
+      det("근사 오차", `${G(r.ppm, 4)} ppm`);
+      if (travelLoad) det("누적 오차 (부하 1,000회전)", `${G(Q.num(travelLoad) * 1000 * r.ppm / 1e6, 4)} ${r.unit}`);
+      msg("warn", r.usesPi
+        ? "원주(π)가 포함되어 정확한 정수비가 존재하지 않습니다. 설정 범위 내 최적 근사값을 사용했으며 장거리 연속 이송 시 누적 오차에 주의하세요."
+        : "정확한 전자기어비가 파라미터 설정 범위를 넘어 근사값을 사용했습니다. 지령 단위나 기구 값을 조정하면 정확한 값이 될 수 있습니다.");
+    }
+    if (travelMotor) det("엔코더 1펄스당 이동량", `${G(Q.num(Q.div(travelMotor, encQ)), 6)} ${r.unit}`);
+    if (Q.cmp(r.exact, Q.ONE) < 0)
+      msg("info", "전자기어비 < 1 : 지령 단위가 엔코더 분해능보다 작습니다. 지령은 받아들여지지만 실제 위치 분해능은 엔코더 1펄스로 제한됩니다.");
+
+    if (i.rpm && Q.sign(i.rpm) > 0) {
+      const rpmS = Q.str(i.rpm);
+      const freq = Q.num(Q.mul(Q.div(i.rpm, Q.make(60n)), ppr));
+      det(`최대 지령 주파수 @ ${rpmS} rpm`, fmtF(freq));
+      if (travelMotor) {
+        const sp = Q.num(Q.mul(Q.div(i.rpm, Q.make(60n)), travelMotor));
+        det(`부하 최대 속도 @ ${rpmS} rpm`, `${G(sp, 6)} ${r.unit}/s  (${G(sp * 60, 6)} ${r.unit}/min)`);
+      }
+      if (!drv.cia && drv.maxK) {
+        if (freq > drv.maxK * 1000) msg("err", `필요 지령 주파수 ${fmtF(freq)} 가 드라이브 최대 입력 ${fmtF(drv.maxK * 1000)} 를 초과합니다. 지령 단위를 키우거나(펄스 수 감소) 최대 회전수를 낮추세요.`);
+        else if (freq > drv.maxK * 900) msg("warn", `필요 지령 주파수가 드라이브 최대 입력(${fmtF(drv.maxK * 1000)})의 90%를 넘습니다.`);
+        if (freq > 200000) msg("info", "200 kpps 초과: 오픈컬렉터 출력의 PLC/상위기로는 불가, 라인드라이버(차동) 출력 사용.");
+      }
+      if (!drv.cia && drv.filterP && drv.filter) {
+        const step = drv.filter.slice().sort((a, b) => a[0] - b[0]).find(s => freq <= s[0] * 1000);
+        if (step) {
+          let idx = 0; r.settings.forEach((s, k) => { if (s.group === "전자기어") idx = k + 1; });
+          r.settings.splice(idx, 0, { group: "전자기어", p: drv.filterP, name: "지령 입력 펄스열 필터", v: step[1], note: `필요 ${fmtF(freq)} → ${fmtF(step[0] * 1000)} 이하용` });
+        }
+      }
+    }
+    if (drv.notes) msg("info", drv.notes);
+  } catch (e) {
+    r.ok = false;
+    msg("err", e.message);
+  }
+  return r;
+}
+
+function applyNumDen(drv, r, encQ, ppr, travelMotor, msg, det) {
+  const exact = r.exact;
+  const applied = Q.best(exact, drv.numMax, drv.denMax);
+  r.applied = applied;
+  r.isExact = Q.eq(applied, exact);
+  r.ppm = r.isExact ? 0 : Q.num(Q.sub(Q.div(applied, exact), Q.ONE)) * 1e6;
+
+  if (drv.setup) r.settings.push({ group: "전자기어", p: "", name: "선행 설정", v: drv.setup, text: true });
+  r.settings.push({ group: "전자기어", p: drv.numP, name: drv.numN, v: applied.n.toString(), note: `범위 1 ~ ${grp(String(drv.numMax))}`, main: "num" });
+  r.settings.push({ group: "전자기어", p: drv.denP, name: drv.denN, v: applied.d.toString(), note: `범위 1 ~ ${grp(String(drv.denMax))}`, main: "den" });
+  if (!drv.numP) msg("warn", "이 드라이브는 파라미터 번호가 등록되어 있지 않습니다. 매뉴얼에서 번호를 확인하세요.");
+
+  const rMin = drv.rMin ? Q.parse(drv.rMin) : null, rMax = drv.rMax ? Q.parse(drv.rMax) : null;
+  const ex = !!drv.rExcl;
+  const out = (rMin && (ex ? Q.cmp(applied, rMin) <= 0 : Q.cmp(applied, rMin) < 0)) || (rMax && (ex ? Q.cmp(applied, rMax) >= 0 : Q.cmp(applied, rMax) > 0));
+  const rangeText = ex ? `${drv.rMin || "-"} < 비 < ${drv.rMax || "-"}` : `${drv.rMin || "-"} ~ ${drv.rMax || "-"}`;
+  if (out) {
+    let m = `전자기어비 ${G(Q.num(applied), 6)} 가 허용 범위(${rangeText})를 벗어납니다.`;
+    if (travelMotor) {
+      const lo = rMin ? G(Q.num(Q.div(Q.mul(rMin, travelMotor), encQ)), 4) : "-";
+      const hi = rMax ? G(Q.num(Q.div(Q.mul(rMax, travelMotor), encQ)), 4) : "-";
+      m += ` 가능한 지령 단위 범위: ${lo} ~ ${hi} ${r.unit}`;
+    }
+    msg(drv.rWarn ? "warn" : "err", m);
+  } else if (rMin || rMax) det("허용 전자기어비", `${rangeText}  → 범위 내`);
+  else msg("info", "이 드라이브는 허용 전자기어비 범위가 등록되어 있지 않아 범위 검사를 생략했습니다.");
+
+  for (const c of drv.compat || []) {
+    const mult = Q.make(BigInt(c.mult));
+    const cq = Q.best(Q.div(exact, mult), drv.numMax, drv.denMax);
+    const eff = Q.mul(cq, mult);
+    const note = Q.eq(eff, exact) ? `실제 분자 = 설정값 × ${c.mult}` : `실제 분자 = 설정값 × ${c.mult}, 근사 오차 ${G(Q.num(Q.sub(Q.div(eff, exact), Q.ONE)) * 1e6, 3)} ppm`;
+    const g = `대안: ${c.name}`;
+    r.settings.push({ group: g, p: "", name: "선행 설정", v: c.setup, text: true });
+    r.settings.push({ group: g, p: drv.numP, name: drv.numN, v: cq.n.toString(), note });
+    r.settings.push({ group: g, p: drv.denP, name: drv.denN, v: cq.d.toString() });
+  }
+
+  if (drv.pprP) {
+    if (Q.isInt(ppr) && ppr.n >= BigInt(drv.pprMin) && ppr.n <= BigInt(drv.pprMax))
+      r.settings.push({ group: "대안", p: drv.pprP, name: drv.pprN, v: ppr.n.toString(), note: drv.pprNote || "" });
+    else msg("info", `${drv.pprP} (1회전당 펄스 수) 방식은 사용 불가: 펄스 수가 ${Q.isInt(ppr) ? "범위 밖" : "정수가 아님"} → 분자/분모 방식을 사용하세요.`);
+  }
+}
+
+function applyCia(drv, i, r, encQ, travelLoad, reducer) {
+  const max = 4294967295n;
+  const gear = Q.best(reducer, max, max);
+  const feedExact = i.mode === "mech" ? Q.div(travelLoad, i.unit) : i.ppr;
+  const feed = Q.best(feedExact, max, max);
+  const applied = Q.div(Q.mul(encQ, gear), feed);
+  r.applied = applied;
+  r.isExact = Q.eq(applied, r.exact);
+  r.ppm = r.isExact ? 0 : Q.num(Q.sub(Q.div(applied, r.exact), Q.ONE)) * 1e6;
+  r.settings.push({ group: "Gear ratio", p: "0x6091:01", name: "Motor revolutions", v: gear.n.toString(), note: "모터 회전수", main: "num" });
+  r.settings.push({ group: "Gear ratio", p: "0x6091:02", name: "Shaft revolutions", v: gear.d.toString(), note: "부하축 회전수" });
+  r.settings.push({ group: "Feed constant", p: "0x6092:01", name: "Feed", v: feed.n.toString(), note: "축 1회전당 사용자 단위 수", main: "den" });
+  r.settings.push({ group: "Feed constant", p: "0x6092:02", name: "Shaft revolutions", v: feed.d.toString() });
+  r.details.push(["위치 계수 (inc / 사용자 단위)", `${Q.str(applied)}  (= ${G(Q.num(applied))})`]);
+  r.details.push(["사용자 단위", i.mode === "mech" ? `1 unit = ${fmtQ(i.unit)} ${r.unit}` : "1 unit = 1 pulse"]);
+}
+
+function report(drv, r) {
+  const L = ["[서보 전자기어비 계산 결과]", `드라이브 : ${drv.mfr} ${drv.series}`];
+  if (r.ok) {
+    L.push(`전자기어비 : ${r.applied.n} / ${r.applied.d}  (= ${G(Q.num(r.applied))})${r.isExact ? "" : `  근사, 오차 ${G(r.ppm, 4)} ppm`}`, "", "[파라미터 설정]");
+    for (const s of r.settings) L.push(`  [${s.group}] ${s.p ? s.p + " " : ""}${s.name} = ${s.v}${s.note ? "   ※ " + s.note : ""}`);
+    L.push("", "[상세]"); for (const [k, v] of r.details) L.push(`  ${k} : ${v}`);
+  }
+  if (r.msgs.length) { L.push("", "[확인 사항]"); for (const m of r.msgs) L.push(`  ${m.sev === "err" ? "✖" : m.sev === "warn" ? "⚠" : "ℹ"} ${m.text}`); }
+  return L.join("\n");
+}
+if (typeof module !== "undefined") module.exports = { Q, DRIVES, calculate, report };
+</script>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = "servo-gear-calc-v1";
+  const inputs = ["enc", "lead", "teeth", "pitch", "dia", "module", "pinion", "direct", "directUnit", "redM", "redL", "unit", "ppr", "rpm"];
+  let mode = "mech";
+  let lastReport = "";
+
+  // 드라이브 목록 (제조사별 그룹)
+  const sel = $("drive");
+  const groups = {};
+  DRIVES.forEach(d => {
+    if (!groups[d.mfr]) { groups[d.mfr] = document.createElement("optgroup"); groups[d.mfr].label = d.mfr; sel.appendChild(groups[d.mfr]); }
+    const o = document.createElement("option");
+    o.value = d.id; o.textContent = d.desc ? `${d.series} · ${d.desc}` : d.series;
+    groups[d.mfr].appendChild(o);
+  });
+  const drive = () => DRIVES.find(d => d.id === sel.value) || DRIVES[0];
+
+  // 프리셋 칩
+  const chips = (box, values, target) => {
+    values.forEach(v => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = v; b.dataset.v = v;
+      b.addEventListener("click", () => { $(target).value = v; update(); });
+      $(box).appendChild(b);
+    });
+  };
+  chips("unitChips", ["1", "0.1", "0.01", "0.001", "0.0001"], "unit");
+  chips("pprChips", ["1000", "5000", "10000", "100000", "131072"], "ppr");
+
+  // 저장된 입력 복원
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (s) {
+      if (s.drive && DRIVES.some(d => d.id === s.drive)) sel.value = s.drive;
+      if (s.mech) $("mech").value = s.mech;
+      if (s.mode) mode = s.mode;
+      inputs.forEach(k => { if (typeof s[k] === "string") $(k).value = s[k]; });
+    }
+  } catch (e) { /* 저장소 사용 불가 */ }
+  if (!$("enc").value) $("enc").value = String(drive().enc);
+
+  function save() {
+    try {
+      const s = { drive: sel.value, mech: $("mech").value, mode };
+      inputs.forEach(k => s[k] = $(k).value);
+      localStorage.setItem(KEY, JSON.stringify(s));
+    } catch (e) { /* 무시 */ }
+  }
+
+  function setMode(m) {
+    mode = m;
+    $("modeMech").setAttribute("aria-pressed", String(m === "mech"));
+    $("modePpr").setAttribute("aria-pressed", String(m === "ppr"));
+    $("mechBox").hidden = m !== "mech";
+    $("pprBox").hidden = m !== "ppr";
+    update();
+  }
+
+  function renderDrive(d) {
+    const dl = $("specs"); dl.textContent = "";
+    const add = (k, v) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); };
+    add("엔코더", `${grp(String(d.enc))} pulse/rev · ${d.encNote}`);
+    if (d.cia) add("방식", "CiA402 · 0x6091 Gear ratio / 0x6092 Feed constant");
+    else {
+      add("분자", `${d.numP || "(번호 미등록)"} · 1 ~ ${grp(String(d.numMax))}`);
+      add("분모", `${d.denP || "(번호 미등록)"} · 1 ~ ${grp(String(d.denMax))}`);
+      add("허용 기어비", d.rMin || d.rMax ? (d.rExcl ? `${d.rMin} < 비 < ${d.rMax}` : `${d.rMin} ~ ${d.rMax}`) : "미등록");
+      add("최대 입력", d.maxK ? `${grp(String(d.maxK))} kpps (차동)` : "미등록");
+    }
+    const src = $("src");
+    src.className = "src " + (d.src === "manual" ? "manual" : "general");
+    src.textContent = d.src === "manual" ? "매뉴얼로 확인한 값" : d.id === "CUSTOM" ? "직접 입력" : "일반 자료값 · 매뉴얼 확인 권장";
+    $("unitCap").textContent = d.cia ? "사용자 단위 (1 unit 이동량)" : "지령 단위 (1 pulse당 이동량)";
+  }
+
+  function readInput() {
+    const bad = [];
+    const P = (id, label, optional) => {
+      const el = $(id); const v = Q.parse(el.value);
+      const isBad = !v && !(optional && !el.value.trim());
+      el.classList.toggle("bad", isBad);
+      if (isBad) bad.push(`'${label}' 값을 숫자로 입력하세요. (예: 10, 0.001, 1/5)`);
+      return v;
+    };
+    const mech = $("mech").value;
+    const i = { mode, mech, directUnit: $("directUnit").value };
+    const encT = $("enc").value.replace(/[,\s]/g, "");
+    const encOk = /^\d+$/.test(encT) && Number(encT) > 0;
+    $("enc").classList.toggle("bad", !encOk);
+    if (encOk) i.enc = Number(encT); else bad.push("'엔코더 분해능'은 1 이상의 정수로 입력하세요.");
+    inputs.slice(1).forEach(id => $(id).classList.remove("bad"));
+    if (mode === "ppr") i.ppr = P("ppr", "모터 1회전당 지령 펄스 수");
+    else {
+      if (mech === "BallScrew") i.lead = P("lead", "볼스크류 리드");
+      if (mech === "BeltTeeth") { i.teeth = P("teeth", "풀리 잇수"); i.pitch = P("pitch", "벨트 피치"); }
+      if (mech === "BeltDia" || mech === "Roll") i.dia = P("dia", "직경");
+      if (mech === "Rack") { i.module = P("module", "모듈"); i.pinion = P("pinion", "피니언 잇수"); }
+      if (mech === "Direct") i.direct = P("direct", "부하 1회전당 이동량");
+      i.redM = P("redM", "감속비(모터)"); i.redL = P("redL", "감속비(부하)");
+      i.unit = P("unit", "지령 단위");
+    }
+    i.rpm = P("rpm", "최대 회전수", true);
+    return { i, bad };
+  }
+
+  function unitLabel() {
+    const m = $("mech").value;
+    return m === "Rotary" ? "°" : m === "Direct" ? ($("directUnit").value.trim() || "unit") : "mm";
+  }
+
+  function update() {
+    const d = drive();
+    const m = $("mech").value;
+    document.querySelectorAll("[data-for]").forEach(f => f.hidden = !f.dataset.for.split(" ").includes(m));
+    $("unitLbl").textContent = unitLabel();
+    document.querySelectorAll("#unitChips button").forEach(b => b.classList.toggle("on", b.dataset.v === $("unit").value.trim()));
+    document.querySelectorAll("#pprChips button").forEach(b => b.classList.toggle("on", b.dataset.v === $("ppr").value.trim()));
+    renderDrive(d);
+
+    const { i, bad } = readInput();
+    let r;
+    if (bad.length) { r = { ok: false, settings: [], details: [], msgs: bad.map(t => ({ sev: "err", text: t })) }; }
+    else r = calculate(d, i);
+    render(d, r);
+    save();
+  }
+
+  function render(d, r) {
+    const hasErr = r.msgs.some(m => m.sev === "err");
+    const kind = !r.ok || hasErr ? "err" : r.isExact ? "ok" : "approx";
+    const badgeText = !r.ok ? "입력 오류" : hasErr ? "설정 불가 · 확인 필요" : r.isExact ? "정확한 값" : `근사값 · 오차 ${G(r.ppm, 3)} ppm`;
+
+    $("headline").dataset.kind = kind;
+    const ratio = $("ratio"); ratio.textContent = "";
+    if (r.ok) {
+      ratio.append(document.createTextNode(r.applied.n.toString()));
+      const sl = document.createElement("span"); sl.className = "slash"; sl.textContent = "/"; ratio.append(sl);
+      ratio.append(document.createTextNode(r.applied.d.toString()));
+      $("dec").textContent = `= ${G(Q.num(r.applied))}`;
+    } else { ratio.textContent = "-"; $("dec").textContent = ""; }
+    const badge = $("badge"); badge.className = "badge " + kind; badge.textContent = badgeText;
+
+    // 파라미터
+    const box = $("params"); box.textContent = "";
+    let lastGroup = null;
+    r.settings.forEach(s => {
+      if (s.group !== lastGroup) {
+        if (lastGroup !== null || s.group !== r.settings[0].group) {
+          const h = document.createElement("div"); h.className = "group-h"; h.textContent = s.group; box.append(h);
+        }
+        lastGroup = s.group;
+      }
+      const row = document.createElement("div"); row.className = "param";
+      const code = document.createElement("div"); code.className = "code"; code.textContent = s.p || (s.text ? "선행 설정" : "—");
+      const val = document.createElement("div"); val.className = "val" + (s.text ? " text" : ""); val.textContent = s.text ? s.v : grp(s.v);
+      if (s.text) row.append(code, val);
+      else {
+        const name = document.createElement("div"); name.className = "name"; name.textContent = s.name;
+        row.append(code, val, name);
+      }
+      if (s.note) { const n = document.createElement("div"); n.className = "note"; n.textContent = s.note; row.append(n); }
+      box.append(row);
+    });
+    if (!r.settings.length) { const p = document.createElement("div"); p.className = "name"; p.style.color = "var(--muted)"; p.textContent = "입력값을 확인하면 여기에 설정값이 나옵니다."; box.append(p); }
+
+    // 메시지
+    const mb = $("msgs"); mb.textContent = "";
+    r.msgs.forEach(m => {
+      const el = document.createElement("div"); el.className = "msg" + (m.sev === "err" ? " err" : m.sev === "warn" ? " warn" : "");
+      const ic = document.createElement("span"); ic.className = "ic"; ic.textContent = m.sev === "err" ? "✕" : m.sev === "warn" ? "!" : "i";
+      const t = document.createElement("span"); t.textContent = m.text;
+      el.append(ic, t); mb.append(el);
+    });
+
+    // 상세
+    const dl = $("details"); dl.textContent = "";
+    r.details.forEach(([k, v]) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); });
+
+    // 하단 고정 바 (휴대폰)
+    const strip = $("strip"); strip.dataset.kind = kind;
+    const sv = $("stripVals"); sv.textContent = "";
+    const num = r.settings.find(s => s.main === "num"), den = r.settings.find(s => s.main === "den");
+    if (r.ok && num && den) {
+      const line = (s) => { const div = document.createElement("div"); div.append(document.createTextNode((s.p || s.name) + " ")); const b = document.createElement("b"); b.textContent = grp(s.v); div.append(b); return div; };
+      sv.append(line(num), line(den));
+    } else sv.textContent = r.msgs[0] ? r.msgs[0].text : "-";
+    const sb = $("stripBadge"); sb.className = "badge " + kind; sb.textContent = kind === "ok" ? "정확" : kind === "approx" ? "근사" : "확인";
+
+    lastReport = r.ok || r.msgs.length ? report(d, r) : "";
+  }
+
+  // 이벤트
+  sel.addEventListener("change", () => { $("enc").value = String(drive().enc); update(); });
+  $("encReset").addEventListener("click", () => { $("enc").value = String(drive().enc); update(); });
+  $("mech").addEventListener("change", update);
+  $("modeMech").addEventListener("click", () => setMode("mech"));
+  $("modePpr").addEventListener("click", () => setMode("ppr"));
+  inputs.forEach(id => $(id).addEventListener("input", update));
+  const goResults = () => $("results").scrollIntoView({ block: "start" });
+  $("strip").addEventListener("click", goResults);
+  $("strip").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goResults(); } });
+
+  $("copy").addEventListener("click", () => {
+    const fb = $("copyFallback");
+    const done = () => { $("toast").textContent = "복사했습니다"; setTimeout(() => $("toast").textContent = "", 2500); };
+    const fallback = () => { fb.hidden = false; fb.value = lastReport; fb.focus(); fb.select(); $("toast").textContent = "아래 내용을 길게 눌러 복사하세요"; };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lastReport).then(() => { fb.hidden = true; done(); }, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  });
+
+  setMode(mode);
+})();
+</script>
+
+<script>if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}</script>
+</body>
+</html>
