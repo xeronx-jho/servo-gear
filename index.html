@@ -438,6 +438,11 @@ const DRIVES = [
     numP: "P1-44", numN: "전자기어 분자 N1", numMax: 67108863, denP: "P1-45", denN: "전자기어 분모 M", denMax: INT_MAX,
     rMin: "1/50", rMax: "25600", maxK: 4000, notes: "저속 펄스 입력은 최대 500 kpps." },
 
+  { id: "NID-SFLAG", mfr: "니덱 산쿄", series: "S-FLAG (DA2□□)", desc: "펄스열", enc: 131072, encNote: "17bit 앱솔루트",
+    numP: "", numN: "지령펄스 체배 A (분자)", numMax: 65535, denP: "", denN: "지령펄스 분주 B (분모)", denMax: 65535,
+    rMin: "1/1000", rMax: "1000", rExcl: true, maxK: 4000,
+    notes: "오픈컬렉터 입력은 최대 200 kpps. 입력 주파수에 맞춰 No.33.0(펄스열 지령 입력 필터)을 설정. 펄스 형식은 No.32.0 (0: 펄스+방향, 1: A/B상, 2: CCW/CW). A/B 파라미터 번호는 매뉴얼에서 확인하세요." },
+
   { id: "CUSTOM", mfr: "사용자 정의", series: "직접 입력 (분자/분모 범용)", desc: "", enc: 131072, encNote: "엔코더 분해능을 직접 입력",
     numP: "", numN: "전자기어 분자", numMax: INT_MAX, denP: "", denN: "전자기어 분모", denMax: INT_MAX, notes: "" },
 ];
