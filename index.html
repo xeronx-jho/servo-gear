@@ -197,10 +197,10 @@ footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
             <select id="mech">
               <option value="BallScrew">볼스크류</option>
               <option value="BeltTeeth">타이밍벨트 (잇수 × 피치)</option>
-              <option value="BeltDia">벨트·풀리 (직경)</option>
+              <option value="BeltDia">벨트·풀리 (피치원 직경 PCD)</option>
               <option value="Rack">랙 & 피니언 (모듈 × 잇수)</option>
               <option value="Rotary">회전 테이블 / 인덱스 (360°)</option>
-              <option value="Roll">롤 피드 (직경)</option>
+              <option value="Roll">롤 피드 (유효 직경)</option>
               <option value="Direct">직접 입력 (부하 1회전당 이동량)</option>
             </select>
           </div>
@@ -210,8 +210,9 @@ footer { margin-top: 20px; color: var(--muted); font-size: 12px; }
             <div class="row"><input type="text" id="teeth" class="num" inputmode="decimal" value="20"><span class="unit">T</span></div></div>
           <div class="field" data-for="BeltTeeth"><label for="pitch">벨트 피치</label>
             <div class="row"><input type="text" id="pitch" class="num" inputmode="decimal" value="5"><span class="unit">mm</span></div></div>
-          <div class="field" data-for="BeltDia Roll"><label for="dia">직경 (D)</label>
+          <div class="field" data-for="BeltDia Roll"><label for="dia" id="diaCap">피치원 직경 (PCD)</label>
             <div class="row"><input type="text" id="dia" class="num" inputmode="decimal" value="50"><span class="unit">mm</span></div></div>
+          <p class="hint" data-for="BeltDia Roll" id="diaHint"></p>
           <div class="field" data-for="Rack"><label for="module">모듈 (m)</label>
             <div class="row"><input type="text" id="module" class="num" inputmode="decimal" value="2"><span class="unit"></span></div></div>
           <div class="field" data-for="Rack"><label for="pinion">피니언 잇수</label>
@@ -438,6 +439,11 @@ const DRIVES = [
     numP: "P1-44", numN: "전자기어 분자 N1", numMax: 67108863, denP: "P1-45", denN: "전자기어 분모 M", denMax: INT_MAX,
     rMin: "1/50", rMax: "25600", maxK: 4000, notes: "저속 펄스 입력은 최대 500 kpps." },
 
+  { id: "NID-SFLAG", mfr: "니덱 산쿄", series: "S-FLAG (DA2□□)", desc: "펄스열", enc: 131072, encNote: "17bit 앱솔루트",
+    numP: "", numN: "지령펄스 체배 A (분자)", numMax: 65535, denP: "", denN: "지령펄스 분주 B (분모)", denMax: 65535,
+    rMin: "1/1000", rMax: "1000", rExcl: true, maxK: 4000,
+    notes: "오픈컬렉터 입력은 최대 200 kpps. 입력 주파수에 맞춰 No.33.0(펄스열 지령 입력 필터)을 설정. 펄스 형식은 No.32.0 (0: 펄스+방향, 1: A/B상, 2: CCW/CW). A/B 파라미터 번호는 매뉴얼에서 확인하세요." },
+
   { id: "CUSTOM", mfr: "사용자 정의", series: "직접 입력 (분자/분모 범용)", desc: "", enc: 131072, encNote: "엔코더 분해능을 직접 입력",
     numP: "", numN: "전자기어 분자", numMax: INT_MAX, denP: "", denN: "전자기어 분모", denMax: INT_MAX, notes: "" },
 ];
@@ -455,10 +461,10 @@ function travelPerLoadRev(i) {
   switch (i.mech) {
     case "BallScrew": pos(i.lead, "볼스크류 리드"); return [i.lead, "mm", false, `볼스크류 (리드 ${Q.str(i.lead)} mm)`];
     case "BeltTeeth": pos(i.teeth, "풀리 잇수"); pos(i.pitch, "벨트 피치"); return [Q.mul(i.teeth, i.pitch), "mm", false, `타이밍벨트 (잇수 ${Q.str(i.teeth)} × 피치 ${Q.str(i.pitch)} mm)`];
-    case "BeltDia": pos(i.dia, "풀리 직경"); return [Q.mul(Q.PI, i.dia), "mm", true, `벨트/풀리 (직경 ${Q.str(i.dia)} mm, π·D)`];
+    case "BeltDia": pos(i.dia, "풀리 피치원 직경(PCD)"); return [Q.mul(Q.PI, i.dia), "mm", true, `벨트·풀리 (PCD ${Q.str(i.dia)} mm, π·PCD)`];
     case "Rack": pos(i.module, "모듈"); pos(i.pinion, "피니언 잇수"); return [Q.mul(Q.mul(Q.PI, i.module), i.pinion), "mm", true, `랙 & 피니언 (모듈 ${Q.str(i.module)} × 잇수 ${Q.str(i.pinion)}, π·m·Z)`];
     case "Rotary": return [Q.make(360n), "°", false, "회전 테이블 (360°/회전)"];
-    case "Roll": pos(i.dia, "롤 직경"); return [Q.mul(Q.PI, i.dia), "mm", true, `롤 피드 (직경 ${Q.str(i.dia)} mm, π·D)`];
+    case "Roll": pos(i.dia, "롤 유효 직경"); return [Q.mul(Q.PI, i.dia), "mm", true, `롤 피드 (유효 직경 ${Q.str(i.dia)} mm, π·D)`];
     case "Direct": { pos(i.direct, "부하 1회전당 이동량"); const u = (i.directUnit || "").trim() || "unit"; return [i.direct, u, false, `직접 입력 (${Q.str(i.direct)} ${u}/회전)`]; }
   }
   throw new Error("알 수 없는 기구 형식입니다.");
@@ -734,6 +740,10 @@ if (typeof module !== "undefined") module.exports = { Q, DRIVES, calculate, repo
     const m = $("mech").value;
     document.querySelectorAll("[data-for]").forEach(f => f.hidden = !f.dataset.for.split(" ").includes(m));
     $("unitLbl").textContent = unitLabel();
+    $("diaCap").textContent = m === "Roll" ? "롤 유효 직경 (D)" : "피치원 직경 (PCD)";
+    $("diaHint").textContent = m === "Roll"
+      ? "소재가 실제로 이송되는 지점의 직경. 소재가 롤에 감기면 롤 직경 + 소재 두께."
+      : "외경(OD)이 아니라 피치원 직경. 타이밍벨트는 '잇수 × 피치'를 쓰면 근사 없이 정확합니다.";
     document.querySelectorAll("#unitChips button").forEach(b => b.classList.toggle("on", b.dataset.v === $("unit").value.trim()));
     document.querySelectorAll("#pprChips button").forEach(b => b.classList.toggle("on", b.dataset.v === $("ppr").value.trim()));
     renderDrive(d);
