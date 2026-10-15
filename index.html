@@ -492,6 +492,8 @@ function calculate(drv, i) {
       det("기구", desc);
       det("부하 1회전당 이동량", `${fmtQ(travelLoad)} ${r.unit}`);
       det("감속비 (모터:부하)", `${Q.str(i.redM)} : ${Q.str(i.redL)}`);
+      if (Q.cmp(i.redM, i.redL) < 0)
+        msg("warn", `감속비가 모터 ${Q.str(i.redM)} : 부하 ${Q.str(i.redL)} 로 입력되어 부하가 모터보다 빠르게 도는 '증속'으로 계산했습니다. 감속기(예: 1/${Q.str(i.redL)})라면 ${Q.str(i.redL)} : ${Q.str(i.redM)} 로 입력하세요.`);
       det("모터 1회전당 이동량", `${fmtQ(travelMotor)} ${r.unit}`);
       det("지령 단위 (1 pulse)", `${fmtQ(i.unit)} ${r.unit}`);
     } else {
